@@ -1,6 +1,11 @@
 # .gitignore
-dashboard-monitoring-kapal-firebase-adminsdk-fbsvc-4dcc10b399.json
-*.pyc
-__pycache__/
+# Firebase admin SDK credentials
+*.json
+
+# Environment variables
 .env
+
+# Files containing sensitive data
+*.key
+
 secrets.toml
