@@ -1,12 +1,21 @@
+import os
+import json
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
 from PIL import Image
 
-# --- SETUP FIREBASE ---
+# --- SETUP FIREBASE (support lokal dan cloud) ---
 if not firebase_admin._apps:
-    cred = credentials.Certificate('dashboard-monitoring-kapal-firebase-adminsdk-fbsvc-4dcc10b399.json')
+    if os.getenv("FIREBASE_CREDENTIALS"):
+        # Untuk Streamlit Cloud, pakai secrets
+        firebase_cert = json.loads(os.getenv("FIREBASE_CREDENTIALS"))
+        cred = credentials.Certificate(firebase_cert)
+    else:
+        # Untuk lokal, pakai file JSON
+        cred = credentials.Certificate('dashboard-monitoring-kapal-firebase-adminsdk-fbsvc-4dcc10b399.json')
+
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
@@ -47,7 +56,7 @@ st.markdown(
 
     .logo-container {
         text-align: center;
-        padding: 0px 0 0px 0;
+        padding: 10px 0;
     }
     </style>
     """,
@@ -58,11 +67,14 @@ st.markdown(
 with st.sidebar:
     # Logo
     st.markdown('<div class="logo-container">', unsafe_allow_html=True)
-    logo = Image.open("assets\Logo_PLMT_c.png")
-    st.image(logo, width=150)
+    try:
+        logo = Image.open("assets/Logo_PLMT_c.png")  # Gunakan "/" bukan "\"
+        st.image(logo, width=150)
+    except Exception as e:
+        st.warning("Logo tidak ditemukan.")  # Supaya tidak crash kalau logo tidak ada
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Inisialisasi menu jika belum ada
+    # Inisialisasi menu
     if "menu" not in st.session_state:
         st.session_state.menu = "Input Kegiatan"
 
@@ -82,8 +94,8 @@ with st.sidebar:
 # --- WARNA TEMA UTAMA ---
 PRIMARY_COLOR = "#0066cc"  # Biru Pelindo
 
-# Remove the header line below to avoid the extra title
-# st.header(st.session_state.menu)
+# --- CONTENT MAIN ---
+st.title("Monitoring Kegiatan Kapal")
 
 if st.session_state.menu == "Input Kegiatan":
     st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Input Kegiatan Operasional Kapal</h2>", unsafe_allow_html=True)
@@ -99,7 +111,6 @@ if st.session_state.menu == "Input Kegiatan":
 
         if submit_button:
             if ppk and nama_kapal:
-                # Simpan ke Firestore
                 data = {
                     'ppk': ppk,
                     'nama_kapal': nama_kapal,
@@ -107,7 +118,15 @@ if st.session_state.menu == "Input Kegiatan":
                     'timestamp_created': datetime.now()
                 }
                 db.collection('kegiatan_operasional').add(data)
-
                 st.success("Data kegiatan kapal berhasil disimpan! ✅")
             else:
                 st.error("Mohon isi semua field sebelum submit.")
+
+elif st.session_state.menu == "Input Pembiayaan":
+    st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Input Pembiayaan</h2>", unsafe_allow_html=True)
+
+elif st.session_state.menu == "Laporan Kegiatan":
+    st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Laporan Kegiatan</h2>", unsafe_allow_html=True)
+
+elif st.session_state.menu == "Laporan Pembiayaan":
+    st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Laporan Pembiayaan</h2>", unsafe_allow_html=True)

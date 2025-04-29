@@ -1,0 +1,6 @@
+# .gitignore
+dashboard-monitoring-kapal-firebase-adminsdk-fbsvc-4dcc10b399.json
+*.pyc
+__pycache__/
+.env
+secrets.toml
