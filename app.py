@@ -7,13 +7,15 @@ from datetime import datetime
 from PIL import Image
 
 # --- SETUP FIREBASE (support lokal dan cloud) ---
-firebase_json = st.secrets["firebase_cred"]
-cred_dict = json.loads(firebase_json)
-
-# Inisialisasi Firebase
-if not firebase_admin._apps:
+try:
+    firebase_json = st.secrets["firebase_cred"]
+    cred_dict = json.loads(firebase_json)
     cred = credentials.Certificate(cred_dict)
-    firebase_admin.initialize_app(cred)
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred)
+    db = firestore.client()
+except Exception as e:
+    st.error(f"Gagal menginisialisasi Firebase: {e}")
 
 db = firestore.client()
 
@@ -122,7 +124,7 @@ with st.sidebar:
         st.session_state.menu = "Input Kegiatan"
 
     # Tombol navigasi
-    menu_options = ["Input Kegiatan", "Input Pembiayaan", "Laporan Kegiatan", "Laporan Pembiayaan"]
+    menu_options = ["Input Kegiatan", "Input Pembiayaan", "Dashboard Laporan"]
 
     for option in menu_options:
         active = "active" if st.session_state.menu == option else ""
@@ -168,8 +170,5 @@ if st.session_state.menu == "Input Kegiatan":
 elif st.session_state.menu == "Input Pembiayaan":
     st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Input Pembiayaan</h2>", unsafe_allow_html=True)
 
-elif st.session_state.menu == "Laporan Kegiatan":
-    st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Laporan Kegiatan</h2>", unsafe_allow_html=True)
-
-elif st.session_state.menu == "Laporan Pembiayaan":
-    st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Laporan Pembiayaan</h2>", unsafe_allow_html=True)
+elif st.session_state.menu == "Dashboard Laporan":
+    st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Dashboard Laporan</h2>", unsafe_allow_html=True)
