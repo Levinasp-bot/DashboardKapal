@@ -172,3 +172,47 @@ elif st.session_state.menu == "Input Pembiayaan":
 
 elif st.session_state.menu == "Dashboard Laporan":
     st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Dashboard Laporan</h2>", unsafe_allow_html=True)
+
+    # Layout dua kolom: kiri 60%, kanan 40%
+    left_col, right_col = st.columns([3, 2])
+
+    with right_col:
+        st.subheader("📋 Laporan Kegiatan (Terbaru)")
+
+        try:
+            kegiatan_docs = db.collection("kegiatan_operasional") \
+                              .order_by("timestamp_created", direction=firestore.Query.DESCENDING).stream()
+
+            kegiatan_data = [doc.to_dict() for doc in kegiatan_docs]
+
+            if kegiatan_data:
+                # Kelompokkan berdasarkan terminal -> dermaga
+                grouped = {}
+                for item in kegiatan_data:
+                    terminal = item.get("terminal", "Tidak Diketahui")
+                    dermaga = item.get("dermaga", "Tidak Diketahui")
+                    grouped.setdefault(terminal, {}).setdefault(dermaga, []).append(item)
+
+                # Tampilkan per kelompok
+                for terminal, dermaga_data in grouped.items():
+                    st.markdown(f"### Terminal {terminal}")
+                    for dermaga, items in dermaga_data.items():
+                        st.markdown(f"**Dermaga {dermaga}**")
+
+                        # Siapkan data untuk tabel
+                        table_rows = []
+                        for row in items:
+                            mulai = row.get("tanggal_mulai")
+                            selesai = row.get("tanggal_selesai", None)
+                            table_rows.append({
+                                "PPK": row.get("ppk", "-"),
+                                "Nama Kapal": row.get("nama_kapal", "-"),
+                                "Mulai": mulai.strftime("%d-%m-%Y %H:%M") if mulai else "-",
+                                "Selesai": selesai.strftime("%d-%m-%Y %H:%M") if selesai else "—"
+                            })
+                        st.dataframe(table_rows, use_container_width=True)
+            else:
+                st.info("Belum ada data kegiatan.")
+
+        except Exception as e:
+            st.error(f"Gagal mengambil data kegiatan: {e}")
