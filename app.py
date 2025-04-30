@@ -25,83 +25,47 @@ st.set_page_config(page_icon="🚢", layout="wide")
 st.markdown(
     """
     <style>
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background-color: #f7f7f7;
+    /* Ukuran sidebar */
+    section[data-testid="stSidebar"] {
+        width: 200px !important;
+    }
+    div[data-testid="stSidebarContent"] {
+        width: 100% !important;
         padding: 0 10px;
     }
 
-    .sidebar-btn {
-        background-color: white;
-        color: #0066cc;
-        font-weight: bold;
-        border: 2px solid #0066cc;
-        border-radius: 12px;
-        padding: 12px 16px;
-        margin: 10px auto;
-        width: 90%;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    .sidebar-btn:hover {
-        background-color: #e6f0ff;
-    }
-
-    .sidebar-btn.active {
-        background-color: #0066cc;
-        color: white;
-    }
-
+    /* Logo container */
     .logo-container {
         text-align: center;
         padding: 10px 0;
     }
 
-    /* Button */
-    button[kind="primary"] {
+    /* Tombol sidebar seragam */
+    div[data-testid="stSidebar"] button {
+        width: 100% !important;
+        background-color: white !important;
+        color: #0066cc !important;
+        border: 2px solid #0066cc !important;
+        border-radius: 12px !important;
+        font-weight: bold !important;
+        padding: 12px 16px !important;
+        margin-top: 10px !important;
+        transition: all 0.3s ease;
+        text-align: center !important;
+    }
+
+    /* Hover efek */
+    div[data-testid="stSidebar"] button:hover {
+        background-color: #e6f0ff !important;
+        color: #0066cc !important;
+        border: 2px solid #0066cc !important;
+    }
+
+    /* Tombol aktif */
+    div[data-testid="stSidebar"] button:focus {
         background-color: #0066cc !important;
         color: white !important;
-        border: none !important;
-        border-radius: 8px !important;
-    }
-
-    button[kind="primary"]:hover {
-        background-color: #005bb5 !important;
-        color: white !important;
-    }
-
-    /* Input fields (text/number/etc.) */
-    .stTextInput > div > input,
-    .stNumberInput > div > input {
-        border: 1px solid #0066cc;
-        border-radius: 5px;
-    }
-
-    .stTextInput > div > input:focus,
-    .stNumberInput > div > input:focus {
-        border: 2px solid #0066cc;
-        box-shadow: 0 0 0 0.2rem rgba(0,102,204,.25);
-        outline: none;
-    }
-
-    /* Headings */
-    h2 {
-        color: #0066cc;
-    }
-
-    /* Other tweaks */
-    .stButton>button {
-        background-color: #0066cc;
-        color: white;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-    }
-
-    .stButton>button:hover {
-        background-color: #005bb5;
-        color: white;
+        border: 2px solid #0066cc !important;
     }
     </style>
     """,
@@ -113,10 +77,10 @@ with st.sidebar:
     # Logo
     st.markdown('<div class="logo-container">', unsafe_allow_html=True)
     try:
-        logo = Image.open("assets/Logo_PLMT_c.png")  # Gunakan "/" bukan "\"
+        logo = Image.open("assets/Logo_PLMT_c.png")
         st.image(logo, width=150)
     except Exception as e:
-        st.warning("Logo tidak ditemukan.")  # Supaya tidak crash kalau logo tidak ada
+        st.warning("Logo tidak ditemukan.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Inisialisasi menu
@@ -127,14 +91,31 @@ with st.sidebar:
     menu_options = ["Input Kegiatan", "Input Pembiayaan", "Dashboard Laporan"]
 
     for option in menu_options:
-        active = "active" if st.session_state.menu == option else ""
-        st.markdown(
-            f"""
-            <div class="sidebar-btn {active}" onclick="window.parent.postMessage({{type: 'streamlit:setSessionState', key: 'menu', value: '{option}' }}, '*')">
-                {option}
-            </div>
-            """, unsafe_allow_html=True
-        )
+        active = st.session_state.menu == option
+        button_id = option.replace(" ", "_")
+
+        button_style = f"""
+            <style>
+            div[data-testid="stSidebar"] div[data-testid="stButton"] > button#{button_id} {{
+                background-color: {"#0066cc" if active else "white"};
+                color: {"white" if active else "#0066cc"};
+                border: 2px solid #0066cc;
+                border-radius: 12px;
+                width: 100%;
+                padding: 12px 16px;
+                margin-top: 10px;
+                font-weight: bold;
+            }}
+            div[data-testid="stSidebar"] div[data-testid="stButton"] > button#{button_id}:hover {{
+                background-color: #e6f0ff;
+                color: #0066cc;
+            }}
+            </style>
+        """
+        st.markdown(button_style, unsafe_allow_html=True)
+        if st.button(option, key=button_id):
+            st.session_state.menu = option
+
 
 PRIMARY_COLOR = "#0066cc" 
 
@@ -177,7 +158,7 @@ elif st.session_state.menu == "Dashboard Laporan":
     left_col, right_col = st.columns([3, 2])
 
     with right_col:
-        st.subheader("📋 Laporan Kegiatan (Terbaru)")
+        st.markdown("<h2>Kegiatan Operasional Kapal</h2>", unsafe_allow_html=True)
 
         try:
             kegiatan_docs = db.collection("kegiatan_operasional") \
@@ -186,20 +167,17 @@ elif st.session_state.menu == "Dashboard Laporan":
             kegiatan_data = [doc.to_dict() for doc in kegiatan_docs]
 
             if kegiatan_data:
-                # Kelompokkan berdasarkan terminal -> dermaga
                 grouped = {}
                 for item in kegiatan_data:
                     terminal = item.get("terminal", "Tidak Diketahui")
                     dermaga = item.get("dermaga", "Tidak Diketahui")
                     grouped.setdefault(terminal, {}).setdefault(dermaga, []).append(item)
 
-                # Tampilkan per kelompok
                 for terminal, dermaga_data in grouped.items():
-                    st.markdown(f"### Terminal {terminal}")
+                    st.markdown(f"### {terminal}")
                     for dermaga, items in dermaga_data.items():
                         st.markdown(f"**Dermaga {dermaga}**")
 
-                        # Siapkan data untuk tabel
                         table_rows = []
                         for row in items:
                             mulai = row.get("tanggal_mulai")
