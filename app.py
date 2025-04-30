@@ -23,8 +23,9 @@ st.set_page_config(page_icon="🚢", layout="wide")
 st.markdown(
     """
     <style>
+    /* Sidebar */
     [data-testid="stSidebar"] {
-        background-color: #f7f7f7;  /* Abu-abu sangat muda */
+        background-color: #f7f7f7;
         padding: 0 10px;
     }
 
@@ -54,6 +55,51 @@ st.markdown(
     .logo-container {
         text-align: center;
         padding: 10px 0;
+    }
+
+    /* Button */
+    button[kind="primary"] {
+        background-color: #0066cc !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+    }
+
+    button[kind="primary"]:hover {
+        background-color: #005bb5 !important;
+        color: white !important;
+    }
+
+    /* Input fields (text/number/etc.) */
+    .stTextInput > div > input,
+    .stNumberInput > div > input {
+        border: 1px solid #0066cc;
+        border-radius: 5px;
+    }
+
+    .stTextInput > div > input:focus,
+    .stNumberInput > div > input:focus {
+        border: 2px solid #0066cc;
+        box-shadow: 0 0 0 0.2rem rgba(0,102,204,.25);
+        outline: none;
+    }
+
+    /* Headings */
+    h2 {
+        color: #0066cc;
+    }
+
+    /* Other tweaks */
+    .stButton>button {
+        background-color: #0066cc;
+        color: white;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+    }
+
+    .stButton>button:hover {
+        background-color: #005bb5;
+        color: white;
     }
     </style>
     """,
@@ -94,19 +140,24 @@ if st.session_state.menu == "Input Kegiatan":
     st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Input Kegiatan Operasional Kapal</h2>", unsafe_allow_html=True)
     st.write("Isi form berikut untuk mencatat kegiatan kapal:")
 
-    with st.form("input_kegiatan"):
+    with st.form(key="input_kegiatan"):  # key pada form
         ppk = st.text_input("PPK")
         nama_kapal = st.text_input("Nama Kapal")
-        tanggal_mulai = datetime.now()
-
-        submit_button = st.form_submit_button(label="Submit")
+        produksi_ton = st.number_input("Produksi (Ton)", min_value=0.0, step=0.1)  # <-- inputan produksi
+        terminal = st.selectbox("Terminal", ["Terminal Nilam", "Terminal Mirah"])
+        dermaga = st.selectbox("Dermaga", ["1", "2", "3"])  # Dummy dermaga
+        
+        submit_button = st.form_submit_button(label="Submit")  # Tidak perlu key di sini
 
         if submit_button:
             if ppk and nama_kapal:
                 data = {
                     'ppk': ppk,
                     'nama_kapal': nama_kapal,
-                    'tanggal_mulai': tanggal_mulai,
+                    'produksi_ton': produksi_ton,
+                    'terminal': terminal,
+                    'dermaga': dermaga,
+                    'tanggal_mulai': datetime.now(),
                     'timestamp_created': datetime.now()
                 }
                 db.collection('kegiatan_operasional').add(data)
