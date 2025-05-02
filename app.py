@@ -5,6 +5,8 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import datetime
 from PIL import Image
+import pandas as pd
+from datetime import datetime, timedelta
 
 # --- SETUP FIREBASE (support lokal dan cloud) ---
 try:
@@ -25,6 +27,23 @@ st.set_page_config(page_icon="🚢", layout="wide")
 st.markdown(
     """
     <style>
+        .block-container {
+        padding-top: 0rem !important;
+        margin-top: 0rem !important;
+    }
+
+    /* Hilangkan ruang header utama jika ada */
+    header[data-testid="stHeader"] {
+        height: 0rem !important;
+        visibility: hidden;
+    }
+
+    /* Hapus margin atas dari elemen pertama */
+    main > div:first-child, .main > div:first-child {
+        margin-top: 0rem !important;
+        padding-top: 0rem !important;
+    }
+    
     /* Ukuran sidebar */
     section[data-testid="stSidebar"] {
         width: 200px !important;
@@ -104,7 +123,7 @@ with st.sidebar:
         st.session_state.menu = "Input Kegiatan"
 
     # Tombol navigasi
-    menu_options = ["Input Kegiatan", "Input Pembiayaan", "Dashboard Laporan"]
+    menu_options = ["Input Kegiatan", "Input Pembiayaan", "Dashboard Operasional Kapal", "Dashboard Pembiayaan"]
 
     for option in menu_options:
         active = st.session_state.menu == option
@@ -166,14 +185,13 @@ if st.session_state.menu == "Input Kegiatan":
 elif st.session_state.menu == "Input Pembiayaan":
     st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Input Pembiayaan</h2>", unsafe_allow_html=True)
 
-elif st.session_state.menu == "Dashboard Laporan":
-    st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Dashboard Laporan</h2>", unsafe_allow_html=True)
-
+elif st.session_state.menu == "Dashboard Operasional Kapal":
     # Layout dua kolom: kiri 60%, kanan 40%
-    left_col, right_col = st.columns([3, 2])
+    left_col, right_col = st.columns([3.5, 2])
 
     with right_col:
         st.markdown("<h4>Kegiatan Operasional Kapal</h4>", unsafe_allow_html=True)
+        
         # Filter rentang tanggal
         today = datetime.now().date()
         col1, col2 = st.columns(2)
@@ -183,25 +201,17 @@ elif st.session_state.menu == "Dashboard Laporan":
             tanggal_selesai_filter = st.date_input("Sampai tanggal", value=today, key="filter_selesai")
 
         st.markdown("""
-        <style>
-        .kegiatan-header, .kegiatan-row {
-            display: flex;
-            border: 1px solid #cccccc;
-        }
-        .kegiatan-cell {
-            flex: 1;
-            padding: 8px;
-            border-right: 1px solid #cccccc;
-        }
-        .kegiatan-cell:last-child {
-            border-right: none;
-        }
-        .kegiatan-header {
-            background-color: #f0f2f6;
-            font-weight: bold;
-        }
-        </style>
+            <style>
+            .stDateInput {
+                margin-bottom: -50px;
+            }
+            h4 {
+                margin-bottom: 0.2rem;
+            }
+            </style>
         """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
 
         try:
             kegiatan_docs = db.collection("kegiatan_operasional") \
@@ -214,7 +224,6 @@ elif st.session_state.menu == "Dashboard Laporan":
                 mulai = item.get("tanggal_mulai")
                 if mulai and tanggal_mulai_filter <= mulai.date() <= tanggal_selesai_filter:
                     kegiatan_data.append(item)
-
 
             if kegiatan_data:
                 # Kelompokkan berdasarkan terminal dan dermaga
@@ -229,38 +238,92 @@ elif st.session_state.menu == "Dashboard Laporan":
                     st.markdown(f"<h5 style='margin-top: 20px;'>{terminal}</h5>", unsafe_allow_html=True)
                     for dermaga, items in dermaga_data.items():
                         st.markdown(f"**Dermaga {dermaga}**")
-
-                        # Header tabel manual
-                        header_cols = st.columns([1.5, 2, 2, 2])
-                        with header_cols[0]: st.markdown("**PPK**")
-                        with header_cols[1]: st.markdown("**Nama Kapal**")
-                        with header_cols[2]: st.markdown("**Mulai**")
-                        with header_cols[3]: st.markdown("**Selesai**")
-
-                        for idx, row in enumerate(items):
+                        
+                        # Mengonversi data ke format DataFrame untuk ditampilkan dengan st.dataframe
+                        df_data = []
+                        for row in items:
                             mulai = row.get("tanggal_mulai")
                             selesai = row.get("tanggal_selesai")
-                            doc_id = row.get("doc_id")
+                            df_data.append({
+                                "PPK": row.get("ppk", "-"),
+                                "Nama Kapal": row.get("nama_kapal", "-"),
+                                "Mulai": mulai.strftime("%d-%m-%Y %H:%M") if mulai else "-",
+                                "Selesai": selesai.strftime("%d-%m-%Y %H:%M") if selesai else "Belum selesai"
+                            })
+                        
+                        # Membuat DataFrame dan menampilkannya
+                        df = pd.DataFrame(df_data)
+                        st.dataframe(df, use_container_width=True)
 
-                            # Baris data
-                            cols = st.columns([1.5, 2, 2, 2])
-                            with cols[0]:
-                                st.write(row.get("ppk", "-"))
-                            with cols[1]:
-                                st.write(row.get("nama_kapal", "-"))
-                            with cols[2]:
-                                st.write(mulai.strftime("%d-%m-%Y %H:%M") if mulai else "-")
-                            with cols[3]:
-                                if selesai:
-                                    st.write(selesai.strftime("%d-%m-%Y %H:%M"))
-                                else:
-                                    unique_key = f"selesai_{terminal}_{dermaga}_{idx}"
-                                    if st.button("Tandai Selesai", key=unique_key):
-                                        db.collection("kegiatan_operasional").document(doc_id).update({
-                                            "tanggal_selesai": datetime.now()
-                                        })
-                                        st.rerun()
             else:
+                st.markdown("<br>", unsafe_allow_html=True)
                 st.info("Belum ada data kegiatan.")
         except Exception as e:
             st.error(f"Gagal mengambil data kegiatan: {e}")
+
+
+elif st.session_state.menu == "Dashboard Pembiayaan":
+    st.markdown("<h4>Laporan Pembiayaan Kapal</h4>", unsafe_allow_html=True)
+    
+    # Default filter tanggal: awal dan akhir bulan ini
+    today = datetime.now().date()
+    first_day_of_month = today.replace(day=1)
+    last_day_of_month = (first_day_of_month.replace(month=first_day_of_month.month % 12 + 1, day=1) - timedelta(days=1))
+
+    col1, col2 = st.columns(2)
+    with col1:
+        pembiayaan_mulai_filter = st.date_input("Mulai tanggal", value=first_day_of_month, key="pembiayaan_mulai")
+    with col2:
+        pembiayaan_selesai_filter = st.date_input("Sampai tanggal", value=last_day_of_month, key="pembiayaan_selesai")
+
+    st.markdown("""
+        <style>
+        .stDateInput {
+            margin-bottom: -50px;
+        }
+        h4 {
+            margin-bottom: 0.2rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    try:
+        kegiatan_docs = db.collection("kegiatan_operasional") \
+            .order_by("timestamp_created", direction=firestore.Query.DESCENDING).stream()
+
+        pembiayaan_data = []
+        for doc in kegiatan_docs:
+            item = doc.to_dict()
+            mulai = item.get("tanggal_mulai")
+            if mulai and pembiayaan_mulai_filter <= mulai.date() <= pembiayaan_selesai_filter:
+                pembiayaan_data.append({
+                    "PPK": item.get("ppk", "-"),
+                    "Nama Kapal": item.get("nama_kapal", "-"),
+                    "Mulai": mulai.strftime("%d-%m-%Y %H:%M") if mulai else "-",
+                    "Selesai": item.get("tanggal_selesai").strftime("%d-%m-%Y %H:%M") if item.get("tanggal_selesai") else "-",
+                    "Produksi": item.get("produksi_ton", "-"),
+                    "Pendapatan": item.get("pendapatan", "-"),
+                    "Biaya": item.get("biaya", "-"),
+                    "Nota": item.get("nota", "-"),
+                    "Pertanggungjawaban": item.get("pertanggungjawaban", "-")
+                })
+
+        if pembiayaan_data:
+            df = pd.DataFrame(pembiayaan_data)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("Tidak ada data pembiayaan untuk rentang tanggal ini.")
+    except Exception as e:
+        st.error(f"Gagal memuat data pembiayaan: {e}")
+
+    # PYMAD Section (judul placeholder)
+    col_pendapatan, col_biaya = st.columns(2)
+    with col_pendapatan:
+        st.markdown("<h4>PYMAD Pendapatan</h4>", unsafe_allow_html=True)
+        # Tabel pendapatan akan ditambahkan di sini nanti
+
+    with col_biaya:
+        st.markdown("<h4>PYMAD Biaya</h4>", unsafe_allow_html=True)
+        # Tabel biaya akan ditambahkan di sini nanti
