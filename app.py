@@ -157,14 +157,26 @@ if st.session_state.menu == "Input Kegiatan":
     st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Input Kegiatan Operasional Kapal</h2>", unsafe_allow_html=True)
     st.write("Isi form berikut untuk mencatat kegiatan kapal:")
 
-    with st.form(key="input_kegiatan"):  # key pada form
+    # Mapping terminal ke daftar dermaga
+    dermaga_map = {
+        "Terminal Mirah": ["Selatan (324)", "Timur (320)", "Kade Intan (100)", "Benoa Kade (75)"],
+        "Terminal Nilam Timur": ["Sisi Selatan (250)", "Sisi Utara (280)", "Bogasari (160)", "Pinda Asen (120)"],
+        "Terminal Nilam Utara": ["Sisi Dalam (66)", "Sisi Luar (156)"]
+    }
+
+    # Pilih terminal di luar form agar bisa trigger update
+    terminal = st.selectbox("Terminal", list(dermaga_map.keys()), key="terminal_selected")
+
+    # Update pilihan dermaga sesuai terminal
+    dermaga_options = dermaga_map.get(terminal, [])
+
+    with st.form(key="input_kegiatan"):
         ppk = st.text_input("PPK")
         nama_kapal = st.text_input("Nama Kapal")
-        produksi_ton = st.number_input("Produksi (Ton)", min_value=0.0, step=0.1)  # <-- inputan produksi
-        terminal = st.selectbox("Terminal", ["Terminal Nilam", "Terminal Mirah"])
-        dermaga = st.selectbox("Dermaga", ["1", "2", "3"])  # Dummy dermaga
-        
-        submit_button = st.form_submit_button(label="Submit")  # Tidak perlu key di sini
+        produksi_ton = st.number_input("Produksi (Ton)", min_value=0.0, step=0.1)
+        dermaga = st.selectbox("Dermaga", dermaga_options, key="dermaga_selected")
+
+        submit_button = st.form_submit_button(label="Submit")
 
         if submit_button:
             if ppk and nama_kapal:
