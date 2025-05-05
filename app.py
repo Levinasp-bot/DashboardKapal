@@ -162,11 +162,11 @@ if st.session_state.menu == "Input Kegiatan":
     dermaga_options = dermaga_map.get(terminal, [])
 
     with st.form(key="input_kegiatan"):
+        dermaga = st.selectbox("Dermaga", dermaga_options, key="dermaga_selected")
         ppk = st.text_input("PPK")
         nama_kapal = st.text_input("Nama Kapal")
         produksi_ton = st.number_input("Produksi (Ton)", min_value=0.0, step=0.1)
-        dermaga = st.selectbox("Dermaga", dermaga_options, key="dermaga_selected")
-
+        
         submit_button = st.form_submit_button(label="Submit")
 
         if submit_button:
