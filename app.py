@@ -192,36 +192,40 @@ elif st.session_state.menu == "Input Pembiayaan":
     try:
         kegiatan_docs = list(
             db.collection("kegiatan_operasional")
-            .where("tanggal_selesai", "!=", None)  # hanya yang selesai-nya tidak null
+            .where("tanggal_selesai", "!=", None)
             .stream()
         )
 
-        if not kegiatan_docs:
-            st.warning("Belum ada data kegiatan operasional yang selesai.")
-            st.stop()
+        # Filter hanya yang belum punya field tarif_1 (pembiayaan)
+        ppk_list = []
+        for doc in kegiatan_docs:
+            data = doc.to_dict()
+            if "ppk" in data and "tarif_1" not in data:
+                ppk_list.append({
+                    "label": data.get("ppk", ""),
+                    "ppk": data.get("ppk", ""),
+                    "nama_kapal": data.get("nama_kapal", ""),
+                    "produksi_ton": data.get("produksi_ton", 0),
+                    "doc_id": doc.id
+                })
 
-        ppk_list = [
-            {
-                "label": f"{doc.to_dict().get('ppk', '')}",
-                "ppk": doc.to_dict().get("ppk", ""),
-                "nama_kapal": doc.to_dict().get("nama_kapal", ""),
-                "produksi_ton": doc.to_dict().get("produksi_ton", 0),
-                "doc_id": doc.id
-            }
-            for doc in kegiatan_docs if "ppk" in doc.to_dict()
-        ]
+        if not ppk_list:
+            st.warning("Tidak ada PPK yang memenuhi kriteria (selesai dan belum punya data pembiayaan).")
+            st.stop()
+        else:
+            st.warning(f"⚠️ {len(ppk_list)} kapal belum diinput pembiayaannya!!!")
 
     except Exception as e:
         st.error(f"Gagal mengambil data kegiatan operasional: {e}")
         st.stop()
 
+    selected_label = st.selectbox("Pilih PPK", options=[k["label"] for k in ppk_list])
+    selected_data = next(item for item in ppk_list if item["label"] == selected_label)
+
+    st.write(f"**Nama Kapal:** {selected_data['nama_kapal']}")
+    st.write(f"**Produksi:** {selected_data['produksi_ton']}")
+
     with st.form(key="input_pembiayaan"):
-        selected_label = st.selectbox("Pilih PPK", options=[k["label"] for k in ppk_list])
-        selected_data = next(item for item in ppk_list if item["label"] == selected_label)
-
-        st.write(f"**Nama Kapal:** {selected_data['nama_kapal']}")
-        st.write(f"**Produksi:** {selected_data['produksi_ton']}")
-
         st.markdown("### Jenis Jasa dan Tarif")
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -241,6 +245,8 @@ elif st.session_state.menu == "Input Pembiayaan":
         pertanggungjawaban_value = "belum"
 
         submit_button = st.form_submit_button(label="Submit")
+        total_tarif = (tarif_1 or 0) + (tarif_2 or 0) + (tarif_3 or 0) + (tarif_4 or 0)
+        biaya = total_tarif * selected_data["produksi_ton"]
 
         if submit_button:
             try:
@@ -253,6 +259,7 @@ elif st.session_state.menu == "Input Pembiayaan":
                     'tarif_3': tarif_3,
                     'jenis_jasa_4': jenis_jasa_4,
                     'tarif_4': tarif_4,
+                    'biaya': biaya,
                     'nota': nota_keluar_value,
                     'pertanggungjawaban': pertanggungjawaban_value,
                     'timestamp_pembiayaan': datetime.now()
@@ -323,6 +330,8 @@ elif st.session_state.menu == "Input Pendapatan":
             tarif_4 = st.number_input("Tarif 4", min_value=0.0, step=1000.0)
 
         submit_button = st.form_submit_button(label="Submit")
+        total_tarif = (tarif_1 or 0) + (tarif_2 or 0) + (tarif_3 or 0) + (tarif_4 or 0)
+        pendapatan = total_tarif * selected_data["produksi_ton"]
 
         if submit_button:
             try:
@@ -335,6 +344,9 @@ elif st.session_state.menu == "Input Pendapatan":
                     'tarif_3_pendapatan': tarif_3,
                     'jenis_jasa_4_pendapatan': jenis_jasa_4,
                     'tarif_4_pendapatan': tarif_4,
+                    'nota': 'belum',
+                    'pendapatan': pendapatan,
+                    'pertanggung_jawaban': 'belum',
                     'timestamp_pendapatan': datetime.now()
                 }
 
@@ -408,7 +420,7 @@ elif st.session_state.menu == "Dashboard Operasional Kapal":
                 item = doc.to_dict()
                 item["doc_id"] = doc.id
                 mulai = item.get("tanggal_mulai")
-                if mulai and tanggal_mulai_filter <= mulai.date() <= tanggal_selesai_filter:
+                if mulai and tanggal_mulai_filter <= mulai.date() <= tanggal_selesai_filter and item.get("tanggal_selesai") is None:
                     kegiatan_data.append(item)
 
             if kegiatan_data:
@@ -494,15 +506,18 @@ elif st.session_state.menu == "Dashboard Pendapatan & Biaya":
 
         for doc in kegiatan_docs:
             item = doc.to_dict()
+            doc_id = doc.id
             mulai = item.get("tanggal_mulai")
+            selesai = item.get("tanggal_selesai")
             nota = str(item.get("nota", "")).lower()
 
-            if mulai and pembiayaan_mulai_filter <= mulai.date() <= pembiayaan_selesai_filter:
+            if mulai and selesai and pembiayaan_mulai_filter <= mulai.date() <= pembiayaan_selesai_filter:
                 pembiayaan_data.append({
+                    "doc_id": doc_id,
                     "PPK": item.get("ppk", "-"),
                     "Nama Kapal": item.get("nama_kapal", "-"),
                     "Mulai": mulai.strftime("%d-%m-%Y %H:%M") if mulai else "-",
-                    "Selesai": item.get("tanggal_selesai").strftime("%d-%m-%Y %H:%M") if item.get("tanggal_selesai") else "-",
+                    "Selesai": selesai.strftime("%d-%m-%Y %H:%M") if selesai else "-",
                     "Produksi": item.get("produksi_ton", "-"),
                     "Pendapatan": item.get("pendapatan", "-"),
                     "Biaya": item.get("biaya", "-"),
@@ -510,28 +525,52 @@ elif st.session_state.menu == "Dashboard Pendapatan & Biaya":
                     "Pertanggungjawaban": item.get("pertanggungjawaban", "-")
                 })
 
-            if mulai and first_day_last_month <= mulai.date() <= last_day_last_month and nota != "done":
+            if mulai and selesai and first_day_last_month <= mulai.date() <= last_day_last_month and nota != "done":
                 pymad_auto_data.append({
                     "PPK": item.get("ppk", "-"),
                     "Nama Kapal": item.get("nama_kapal", "-"),
                     "Mulai": mulai.strftime("%d-%m-%Y %H:%M") if mulai else "-",
-                    "Selesai": item.get("tanggal_selesai").strftime("%d-%m-%Y %H:%M") if item.get("tanggal_selesai") else "-",
+                    "Selesai": selesai.strftime("%d-%m-%Y %H:%M") if selesai else "-",
                     "Pendapatan": item.get("pendapatan", "-"),
                     "Biaya": item.get("biaya", "-")
                 })
 
         if pembiayaan_data:
-            df = pd.DataFrame(pembiayaan_data)
-            st.dataframe(df, use_container_width=True)
+            st.markdown("### Data Pembiayaan")
+            for i, row in enumerate(pembiayaan_data):
+                with st.expander(f"{row['PPK']} - {row['Nama Kapal']}"):
+                    st.write(f"**Mulai:** {row['Mulai']}")
+                    st.write(f"**Selesai:** {row['Selesai']}")
+                    st.write(f"**Produksi:** {row['Produksi']}")
+                    st.write(f"**Pendapatan:** {row['Pendapatan']}")
+                    st.write(f"**Biaya:** {row['Biaya']}")
+
+                    nota_key = f"nota_{i}"
+                    ptj_key = f"ptj_{i}"
+                    nota_default = row["Nota"].lower() == "done"
+                    ptj_default = row["Pertanggungjawaban"].lower() == "done"
+
+                    nota_checked = st.checkbox("Nota", value=nota_default, key=nota_key)
+                    ptj_checked = st.checkbox("Pertanggungjawaban", value=ptj_default, key=ptj_key)
+
+                    # Update ke Firestore jika checkbox berubah dan belum "done"
+                    if nota_checked and row["Nota"].lower() != "done":
+                        db.collection("kegiatan_operasional").document(row["doc_id"]).update({"nota": "done"})
+                        st.success("✅ Nota diperbarui menjadi 'done'")
+
+                    if ptj_checked and row["Pertanggungjawaban"].lower() != "done":
+                        db.collection("kegiatan_operasional").document(row["doc_id"]).update({"pertanggungjawaban": "done"})
+                        st.success("✅ Pertanggungjawaban diperbarui menjadi 'done'")
+
         else:
             st.info("Tidak ada data pembiayaan untuk rentang tanggal ini.")
-    
+
         col_pendapatan, col_biaya = st.columns(2)
 
         with col_pendapatan:
             st.markdown("<h4>PYMAD</h4>", unsafe_allow_html=True)
             if pymad_auto_data:
-                df_pendapatan = pd.DataFrame(pymad_auto_data)[["PPK", "Nama Kapal", "Mulai", "Pendapatan"]]
+                df_pendapatan = pd.DataFrame(pymad_auto_data)[["PPK", "Nama Kapal", "Pendapatan"]]
                 st.dataframe(df_pendapatan, use_container_width=True)
             else:
                 st.info("Tidak ada data PYMAD.")
@@ -539,7 +578,7 @@ elif st.session_state.menu == "Dashboard Pendapatan & Biaya":
         with col_biaya:
             st.markdown("<h4>BYMAD</h4>", unsafe_allow_html=True)
             if pymad_auto_data:
-                df_biaya = pd.DataFrame(pymad_auto_data)[["PPK", "Nama Kapal", "Mulai", "Biaya"]]
+                df_biaya = pd.DataFrame(pymad_auto_data)[["PPK", "Nama Kapal", "Biaya"]]
                 st.dataframe(df_biaya, use_container_width=True)
             else:
                 st.info("Tidak ada data BYMAD.")
