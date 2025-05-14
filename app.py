@@ -187,8 +187,7 @@ if st.session_state.menu == "Input Kegiatan":
 
 elif st.session_state.menu == "Update Kegiatan":
     st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Update Kegiatan Kapal</h2>", unsafe_allow_html=True)
-    st.write("Pilih kapal yang sudah selesai, lalu centang jika ingin tandai sebagai belum selesai, atau ubah nilai produksi:")
-
+    
     dermaga_map = {
         "Terminal Mirah": ["Selatan (324)", "Timur (320)", "Kade Intan (100)", "Benoa Kade (75)"],
         "Terminal Nilam Timur": ["Sisi Selatan (250)", "Sisi Utara (280)", "Bogasari (160)", "Pinda Asen (120)"],
