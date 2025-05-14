@@ -117,7 +117,7 @@ with st.sidebar:
     if "menu" not in st.session_state:
         st.session_state.menu = "Input Kegiatan"
 
-    menu_options = ["Input Kegiatan", "Input Pembiayaan", "Input Pendapatan", "Dashboard Operasional Kapal", "Dashboard Pendapatan & Biaya"]
+    menu_options = ["Input Kegiatan", "Update Kegiatan", "Input Pembiayaan", "Input Pendapatan", "Dashboard Operasional Kapal", "Dashboard Pendapatan & Biaya"]
 
     for option in menu_options:
         active = st.session_state.menu == option
@@ -184,6 +184,75 @@ if st.session_state.menu == "Input Kegiatan":
                 st.success("Data kegiatan kapal berhasil disimpan! ✅")
             else:
                 st.error("Mohon isi semua field sebelum submit.")
+
+elif st.session_state.menu == "Update Kegiatan":
+    st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Update Kegiatan Kapal</h2>", unsafe_allow_html=True)
+    st.write("Pilih kapal yang sudah selesai, lalu centang jika ingin tandai sebagai belum selesai, atau ubah nilai produksi:")
+
+    dermaga_map = {
+        "Terminal Mirah": ["Selatan (324)", "Timur (320)", "Kade Intan (100)", "Benoa Kade (75)"],
+        "Terminal Nilam Timur": ["Sisi Selatan (250)", "Sisi Utara (280)", "Bogasari (160)", "Pinda Asen (120)"],
+        "Terminal Nilam Utara": ["Sisi Dalam (66)", "Sisi Luar (156)"]
+    }
+
+    # Filter tanggal tunggal
+    filter_tanggal = st.date_input("Pilih Tanggal Mulai")
+
+    terminal = st.selectbox("Pilih Terminal", list(dermaga_map.keys()), key="update_terminal")
+    dermaga_options = dermaga_map.get(terminal, [])
+    dermaga = st.selectbox("Pilih Dermaga", dermaga_options, key="update_dermaga")
+
+    kegiatan_docs = db.collection("kegiatan_operasional") \
+        .where("terminal", "==", terminal) \
+        .where("dermaga", "==", dermaga) \
+        .stream()
+
+    ppk_options = []
+    kegiatan_dict = {}
+
+    for doc in kegiatan_docs:
+        data = doc.to_dict()
+        tanggal_mulai = data.get("tanggal_mulai")
+        tanggal_selesai = data.get("tanggal_selesai")
+        
+        # Cocokkan tanggal_mulai dengan tanggal filter
+        if tanggal_selesai and tanggal_mulai:
+            if tanggal_mulai.date() == filter_tanggal:
+                ppk = data.get("ppk")
+                ppk_options.append(ppk)
+                kegiatan_dict[ppk] = {
+                    "doc_id": doc.id,
+                    "data": data
+                }
+
+    if not ppk_options:
+        st.warning("Tidak ada kapal selesai pada tanggal dan dermaga ini.")
+    else:
+        selected_ppk = st.selectbox("Pilih PPK Kapal", ppk_options)
+
+        selected_data = kegiatan_dict[selected_ppk]["data"]
+        produksi_lama = selected_data.get("produksi_ton", 0)
+
+        produksi_baru = st.number_input("Update Produksi (Ton)", value=float(produksi_lama), min_value=0.0, step=0.1)
+        tandai_belum_selesai = st.checkbox("Tandai sebagai 'Belum Selesai'")
+
+        if st.button("Update"):
+            update_data = {}
+
+            # Tambahkan perubahan produksi jika berbeda
+            if produksi_baru != produksi_lama:
+                update_data["produksi_ton"] = produksi_baru
+
+            # Tambahkan penghapusan tanggal_selesai jika dicentang
+            if tandai_belum_selesai:
+                update_data["tanggal_selesai"] = firestore.DELETE_FIELD
+
+            if update_data:
+                doc_id = kegiatan_dict[selected_ppk]["doc_id"]
+                db.collection("kegiatan_operasional").document(doc_id).update(update_data)
+                st.success(f"Data kapal PPK {selected_ppk} berhasil diperbarui. ✅")
+            else:
+                st.info("Tidak ada perubahan dilakukan.")
 
 elif st.session_state.menu == "Input Pembiayaan":
     st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Input Pembiayaan</h2>", unsafe_allow_html=True)
