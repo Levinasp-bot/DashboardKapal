@@ -452,16 +452,6 @@ elif st.session_state.menu == "Update Pembiayaan":
         st.session_state.update_tarif_list = selected_data["jenis_jasa_dan_tarif"].copy()
         st.session_state.update_target_id = selected_data["doc_id"]
 
-    # Tombol hapus dan tambah baris
-    for i in range(len(st.session_state.update_tarif_list)):
-        if st.button(f"❌ Hapus Baris {i+1}", key=f"update_remove_{i}"):
-            st.session_state.update_tarif_list.pop(i)
-            st.rerun()
-
-    if st.button("➕ Tambah Baris Jasa (Update)"):
-        st.session_state.update_tarif_list.append({"jenis": "", "tarif": 0.0})
-        st.rerun()
-
     with st.form(key="form_update_pembiayaan"):
         for i, entry in enumerate(st.session_state.update_tarif_list):
             cols = st.columns([3, 2])
@@ -482,6 +472,16 @@ elif st.session_state.menu == "Update Pembiayaan":
                 )
 
         submit_update = st.form_submit_button("Update Pembiayaan")
+
+    # Tombol hapus dan tambah baris
+    for i in range(len(st.session_state.update_tarif_list)):
+        if st.button(f"❌ Hapus Baris {i+1}", key=f"update_remove_{i}"):
+            st.session_state.update_tarif_list.pop(i)
+            st.rerun()
+
+    if st.button("➕ Tambah Baris Jasa (Update)"):
+        st.session_state.update_tarif_list.append({"jenis": "", "tarif": 0.0})
+        st.rerun()
 
     if submit_update:
         try:
