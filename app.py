@@ -117,33 +117,52 @@ with st.sidebar:
     if "menu" not in st.session_state:
         st.session_state.menu = "Input Kegiatan"
 
-    menu_options = ["Input Kegiatan", "Update Kegiatan", "Input Pembiayaan", "Input Pendapatan", "Dashboard Operasional Kapal", "Dashboard Pendapatan & Biaya"]
+    PRIMARY_COLOR = "#0066cc"
 
-    for option in menu_options:
-        active = st.session_state.menu == option
-        button_id = option.replace(" ", "_")
+    menu_sections = {
+        "Input": [
+            "Input Kegiatan",
+            "Input Pembiayaan",
+            "Input Pendapatan"
+        ],
+        "Update": [
+            "Update Kegiatan",
+            "Update Pembiayaan",
+            "Update Pendapatan"
+        ],
+        "Dashboard": [
+            "Dashboard Operasional Kapal",
+            "Dashboard Pendapatan & Biaya"
+        ]
+    }
 
-        button_style = f"""
-            <style>
-            div[data-testid="stSidebar"] div[data-testid="stButton"] > button#{button_id} {{
-                background-color: {"#0066cc" if active else "white"};
-                color: {"white" if active else "#0066cc"};
-                border: 2px solid #0066cc;
-                border-radius: 12px;
-                width: 100%;
-                padding: 12px 16px;
-                margin-top: 10px;
-                font-weight: bold;
-            }}
-            div[data-testid="stSidebar"] div[data-testid="stButton"] > button#{button_id}:hover {{
-                background-color: #e6f0ff;
-                color: #0066cc;
-            }}
-            </style>
-        """
-        st.markdown(button_style, unsafe_allow_html=True)
-        if st.button(option, key=button_id):
-            st.session_state.menu = option
+    for section_title, options in menu_sections.items():
+        st.markdown(f"### {section_title}")
+        for option in options:
+            active = st.session_state.menu == option
+            button_id = option.replace(" ", "_")
+
+            button_style = f"""
+                <style>
+                div[data-testid="stSidebar"] div[data-testid="stButton"] > button#{button_id} {{
+                    background-color: {"#0066cc" if active else "white"};
+                    color: {"white" if active else "#0066cc"};
+                    border: 2px solid #0066cc;
+                    border-radius: 12px;
+                    width: 100%;
+                    padding: 12px 16px;
+                    margin-top: 6px;
+                    font-weight: bold;
+                }}
+                div[data-testid="stSidebar"] div[data-testid="stButton"] > button#{button_id}:hover {{
+                    background-color: #e6f0ff;
+                    color: #0066cc;
+                }}
+                </style>
+            """
+            st.markdown(button_style, unsafe_allow_html=True)
+            if st.button(option, key=button_id):
+                st.session_state.menu = option
 
 PRIMARY_COLOR = "#0066cc" 
 
@@ -264,11 +283,10 @@ elif st.session_state.menu == "Input Pembiayaan":
             .stream()
         )
 
-        # Filter hanya yang belum punya field tarif_1 (pembiayaan)
         ppk_list = []
         for doc in kegiatan_docs:
             data = doc.to_dict()
-            if "ppk" in data and "tarif_1" not in data:
+            if "ppk" in data and "jenis_jasa_dan_tarif" not in data:
                 ppk_list.append({
                     "label": data.get("ppk", ""),
                     "ppk": data.get("ppk", ""),
@@ -291,54 +309,213 @@ elif st.session_state.menu == "Input Pembiayaan":
     selected_data = next(item for item in ppk_list if item["label"] == selected_label)
 
     st.write(f"**Nama Kapal:** {selected_data['nama_kapal']}")
-    st.write(f"**Produksi:** {selected_data['produksi_ton']}")
+    st.write(f"**Produksi:** {selected_data['produksi_ton']} ton")
 
-    with st.form(key="input_pembiayaan"):
-        st.markdown("### Jenis Jasa dan Tarif")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            jenis_jasa_1 = st.text_input("Jenis Jasa 1")
-            tarif_1 = st.number_input("Tarif 1", min_value=0.0, step=1000.0)
-        with col2:
-            jenis_jasa_2 = st.text_input("Jenis Jasa 2")
-            tarif_2 = st.number_input("Tarif 2", min_value=0.0, step=1000.0)
-        with col3:
-            jenis_jasa_3 = st.text_input("Jenis Jasa 3")
-            tarif_3 = st.number_input("Tarif 3", min_value=0.0, step=1000.0)
-        with col4:
-            jenis_jasa_4 = st.text_input("Jenis Jasa 4")
-            tarif_4 = st.number_input("Tarif 4", min_value=0.0, step=1000.0)
+    try:
+        coa_docs = db.collection("COA_biaya").stream()
+        coa_list = []
+        for doc in coa_docs:
+            data = doc.to_dict()
+            detail = data.get("detail", [])
+            if isinstance(detail, list):
+                coa_list.extend(detail)
+        coa_list = sorted(list(set(coa_list)))  
+    except Exception as e:
+        st.error(f"Gagal mengambil data COA biaya: {e}")
+        coa_list = []
 
-        nota_keluar_value = "belum"
-        pertanggungjawaban_value = "belum"
 
-        submit_button = st.form_submit_button(label="Submit")
-        total_tarif = (tarif_1 or 0) + (tarif_2 or 0) + (tarif_3 or 0) + (tarif_4 or 0)
-        biaya = total_tarif * selected_data["produksi_ton"]
+    st.markdown("### Jenis Jasa dan Tarif")
 
-        if submit_button:
-            try:
-                data_update = {
-                    'jenis_jasa_1': jenis_jasa_1,
-                    'tarif_1': tarif_1,
-                    'jenis_jasa_2': jenis_jasa_2,
-                    'tarif_2': tarif_2,
-                    'jenis_jasa_3': jenis_jasa_3,
-                    'tarif_3': tarif_3,
-                    'jenis_jasa_4': jenis_jasa_4,
-                    'tarif_4': tarif_4,
-                    'biaya': biaya,
-                    'nota': nota_keluar_value,
-                    'pertanggungjawaban': pertanggungjawaban_value,
-                    'timestamp_pembiayaan': datetime.now()
-                }
+    if "tarif_list" not in st.session_state:
+        st.session_state.tarif_list = [{"jenis": "", "tarif": 0.0}]
 
-                doc_ref = db.collection("kegiatan_operasional").document(selected_data["doc_id"])
-                doc_ref.update(data_update)
-                st.success("Data pembiayaan berhasil diperbarui ✅")
+    # Form untuk input data jenis dan tarif
+    with st.form(key="form_pembiayaan"):
+        for i, entry in enumerate(st.session_state.tarif_list):
+            cols = st.columns([3, 2])
+            with cols[0]:
+                st.session_state.tarif_list[i]["jenis"] = st.selectbox(
+                    f"Jenis Jasa {i+1}",
+                    options=coa_list,
+                    index=coa_list.index(entry["jenis"]) if entry["jenis"] in coa_list else 0,
+                    key=f"jenis_{i}"
+                )
+            with cols[1]:
+                st.session_state.tarif_list[i]["tarif"] = st.number_input(
+                    f"Tarif {i+1}",
+                    min_value=0.0,
+                    step=1000.0,
+                    value=entry["tarif"],
+                    key=f"tarif_{i}"
+                )
 
-            except Exception as e:
-                st.error(f"Gagal menyimpan data: {e}")
+        submit_button = st.form_submit_button("Submit")
+
+    # Tombol-tombol di bawah form
+    cols_btn = st.columns([2, 2])
+    with cols_btn[0]:
+        if st.button("➕ Tambah Baris Jasa"):
+            st.session_state.tarif_list.append({"jenis": "", "tarif": 0.0})
+            st.rerun()
+
+    with cols_btn[1]:
+        for i in range(len(st.session_state.tarif_list)):
+            if st.button(f"❌ Hapus Baris {i+1}", key=f"remove_{i}"):
+                st.session_state.tarif_list.pop(i)
+                st.rerun()
+
+    if submit_button:
+        try:
+            jasa_tarif_final = [entry for entry in st.session_state.tarif_list if entry["jenis"] and entry["tarif"] > 0]
+            if not jasa_tarif_final:
+                st.error("Minimal satu jasa dengan tarif harus diisi.")
+                st.stop()
+
+            jasa_tarif_string_dict = {}
+            for idx, entry in enumerate(jasa_tarif_final, start=1):
+                jasa_tarif_string_dict[f"jenis_jasa_{idx}"] = entry["jenis"]
+                jasa_tarif_string_dict[f"tarif_{idx}"] = str(entry["tarif"])  # bisa juga float kalau mau
+
+            total_tarif = sum(entry["tarif"] for entry in jasa_tarif_final)
+            produksi_ton = selected_data["produksi_ton"]
+            biaya_total = total_tarif * produksi_ton
+
+            data_update = {
+                **jasa_tarif_string_dict,  
+                "biaya": biaya_total,
+                "nota": "belum",
+                "pertanggungjawaban": "belum",
+                "timestamp_pembiayaan": datetime.now()
+            }
+
+            db.collection("kegiatan_operasional").document(selected_data["doc_id"]).update(data_update)
+            st.success("✅ Data pembiayaan berhasil disimpan.")
+            del st.session_state.tarif_list  # reset form setelah submit
+
+        except Exception as e:
+            st.error(f"Gagal menyimpan data: {e}")
+
+elif st.session_state.menu == "Update Pembiayaan":
+    st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Update Pembiayaan</h2>", unsafe_allow_html=True)
+    st.write("Pilih kegiatan untuk mengubah data pembiayaannya:")
+
+    try:
+        kegiatan_docs = list(
+            db.collection("kegiatan_operasional")
+            .where("jenis_jasa_dan_tarif", "!=", None)
+            .stream()
+        )
+
+        ppk_list = []
+        for doc in kegiatan_docs:
+            data = doc.to_dict()
+            if "ppk" in data:
+                ppk_list.append({
+                    "label": data.get("ppk", ""),
+                    "ppk": data.get("ppk", ""),
+                    "nama_kapal": data.get("nama_kapal", ""),
+                    "produksi_ton": data.get("produksi_ton", 0),
+                    "doc_id": doc.id,
+                    "jenis_jasa_dan_tarif": data.get("jenis_jasa_dan_tarif", [])
+                })
+
+        if not ppk_list:
+            st.warning("Tidak ada kegiatan dengan data pembiayaan untuk diperbarui.")
+            st.stop()
+    except Exception as e:
+        st.error(f"Gagal mengambil data kegiatan: {e}")
+        st.stop()
+
+    selected_label = st.selectbox("Pilih PPK", options=[k["label"] for k in ppk_list])
+    selected_data = next(item for item in ppk_list if item["label"] == selected_label)
+
+    st.write(f"**Nama Kapal:** {selected_data['nama_kapal']}")
+    st.write(f"**Produksi:** {selected_data['produksi_ton']} ton")
+
+    try:
+        coa_docs = db.collection("COA_biaya").stream()
+        coa_list = []
+        for doc in coa_docs:
+            data = doc.to_dict()
+            detail = data.get("detail", [])
+            if isinstance(detail, list):
+                coa_list.extend(detail)
+        coa_list = sorted(list(set(coa_list)))
+    except Exception as e:
+        st.error(f"Gagal mengambil data COA biaya: {e}")
+        coa_list = []
+
+    st.markdown("### Update Jenis Jasa dan Tarif")
+
+    if "update_tarif_list" not in st.session_state or st.session_state.get("update_target_id") != selected_data["doc_id"]:
+        st.session_state.update_tarif_list = selected_data["jenis_jasa_dan_tarif"].copy()
+        st.session_state.update_target_id = selected_data["doc_id"]
+
+    # Tombol hapus dan tambah baris
+    for i in range(len(st.session_state.update_tarif_list)):
+        if st.button(f"❌ Hapus Baris {i+1}", key=f"update_remove_{i}"):
+            st.session_state.update_tarif_list.pop(i)
+            st.rerun()
+
+    if st.button("➕ Tambah Baris Jasa (Update)"):
+        st.session_state.update_tarif_list.append({"jenis": "", "tarif": 0.0})
+        st.rerun()
+
+    with st.form(key="form_update_pembiayaan"):
+        for i, entry in enumerate(st.session_state.update_tarif_list):
+            cols = st.columns([3, 2])
+            with cols[0]:
+                st.session_state.update_tarif_list[i]["jenis"] = st.selectbox(
+                    f"Jenis Jasa {i+1} (Update)",
+                    options=coa_list,
+                    index=coa_list.index(entry["jenis"]) if entry["jenis"] in coa_list else 0,
+                    key=f"update_jenis_{i}"
+                )
+            with cols[1]:
+                st.session_state.update_tarif_list[i]["tarif"] = st.number_input(
+                    f"Tarif {i+1} (Update)",
+                    min_value=0.0,
+                    step=1000.0,
+                    value=entry["tarif"],
+                    key=f"update_tarif_{i}"
+                )
+
+        submit_update = st.form_submit_button("Update Pembiayaan")
+
+    if submit_update:
+        try:
+            jasa_tarif_final = [
+                entry for entry in st.session_state.update_tarif_list
+                if entry["jenis"] and entry["tarif"] > 0
+            ]
+            if not jasa_tarif_final:
+                st.error("Minimal satu jasa dengan tarif harus diisi.")
+                st.stop()
+
+            jasa_tarif_string_dict = {}
+            for idx, entry in enumerate(jasa_tarif_final, start=1):
+                jasa_tarif_string_dict[f"jenis_jasa_{idx}"] = entry["jenis"]
+                jasa_tarif_string_dict[f"tarif_{idx}"] = str(entry["tarif"])  # jika mau float, hilangkan str()
+
+            total_tarif = sum(entry["tarif"] for entry in jasa_tarif_final)
+            biaya_total = total_tarif * selected_data["produksi_ton"]
+
+            data_update = {
+                **jasa_tarif_string_dict,
+                "biaya": biaya_total,
+                "timestamp_update_pembiayaan": datetime.now()
+            }
+
+            # update Firestore
+            db.collection("kegiatan_operasional").document(selected_data["doc_id"]).update(data_update)
+
+            st.success("✅ Data pembiayaan berhasil diperbarui.")
+            del st.session_state.update_tarif_list
+            del st.session_state.update_target_id
+
+        except Exception as e:
+            st.error(f"Gagal memperbarui data: {e}")
 
 elif st.session_state.menu == "Input Pendapatan":
     st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Input Pendapatan</h2>", unsafe_allow_html=True)
@@ -347,11 +524,10 @@ elif st.session_state.menu == "Input Pendapatan":
     try:
         kegiatan_docs = list(
             db.collection("kegiatan_operasional")
-            .where("tanggal_selesai", "!=", None)  # hanya yang selesai-nya tidak null
+            .where("tanggal_selesai", "!=", None)
             .stream()
         )
 
-        # Filter hanya yang belum punya field tarif_1_pendapatan
         ppk_list = []
         for doc in kegiatan_docs:
             data = doc.to_dict()
@@ -368,8 +544,7 @@ elif st.session_state.menu == "Input Pendapatan":
             st.warning("Tidak ada PPK yang memenuhi kriteria (selesai dan belum punya data pendapatan).")
             st.stop()
         else:
-            st.warning(f"⚠️ {len(ppk_list)} kapal belum di input pendapatannya!!!")
-
+            st.warning(f"⚠️ {len(ppk_list)} kapal belum diinput pendapatannya!!!")
 
     except Exception as e:
         st.error(f"Gagal mengambil data kegiatan operasional: {e}")
@@ -379,51 +554,224 @@ elif st.session_state.menu == "Input Pendapatan":
     selected_data = next(item for item in ppk_list if item["label"] == selected_label)
 
     st.write(f"**Nama Kapal:** {selected_data['nama_kapal']}")
-    st.write(f"**Produksi:** {selected_data['produksi_ton']}")
-        
-    with st.form(key="input_pendapatan"):
-        st.markdown("### Jenis Jasa dan Tarif")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            jenis_jasa_1 = st.text_input("Jenis Jasa 1")
-            tarif_1 = st.number_input("Tarif 1", min_value=0.0, step=1000.0)
-        with col2:
-            jenis_jasa_2 = st.text_input("Jenis Jasa 2")
-            tarif_2 = st.number_input("Tarif 2", min_value=0.0, step=1000.0)
-        with col3:
-            jenis_jasa_3 = st.text_input("Jenis Jasa 3")
-            tarif_3 = st.number_input("Tarif 3", min_value=0.0, step=1000.0)
-        with col4:
-            jenis_jasa_4 = st.text_input("Jenis Jasa 4")
-            tarif_4 = st.number_input("Tarif 4", min_value=0.0, step=1000.0)
+    st.write(f"**Produksi:** {selected_data['produksi_ton']} ton")
 
-        submit_button = st.form_submit_button(label="Submit")
-        total_tarif = (tarif_1 or 0) + (tarif_2 or 0) + (tarif_3 or 0) + (tarif_4 or 0)
-        pendapatan = total_tarif * selected_data["produksi_ton"]
+    try:
+        coa_docs = db.collection("COA_Pendapatan").stream()
+        coa_list = []
+        for doc in coa_docs:
+            data = doc.to_dict()
+            detail = data.get("detail", [])
+            if isinstance(detail, list):
+                coa_list.extend(detail)
+        coa_list = sorted(list(set(coa_list)))
+    except Exception as e:
+        st.error(f"Gagal mengambil data COA pendapatan: {e}")
+        coa_list = []
 
-        if submit_button:
-            try:
-                data_update = {
-                    'jenis_jasa_1_pendapatan': jenis_jasa_1,
-                    'tarif_1_pendapatan': tarif_1,
-                    'jenis_jasa_2_pendapatan': jenis_jasa_2,
-                    'tarif_2_pendapatan': tarif_2,
-                    'jenis_jasa_3_pendapatan': jenis_jasa_3,
-                    'tarif_3_pendapatan': tarif_3,
-                    'jenis_jasa_4_pendapatan': jenis_jasa_4,
-                    'tarif_4_pendapatan': tarif_4,
-                    'nota': 'belum',
-                    'pendapatan': pendapatan,
-                    'pertanggung_jawaban': 'belum',
-                    'timestamp_pendapatan': datetime.now()
-                }
+    st.markdown("### Jenis Jasa dan Tarif")
 
-                doc_ref = db.collection("kegiatan_operasional").document(selected_data["doc_id"])
-                doc_ref.update(data_update)
-                st.success("Data pendapatan berhasil diperbarui ✅")
+    if "tarif_pendapatan_list" not in st.session_state:
+        st.session_state.tarif_pendapatan_list = [{"jenis": "", "tarif": 0.0}]
 
-            except Exception as e:
-                st.error(f"Gagal menyimpan data: {e}")
+    with st.form(key="form_pendapatan"):
+        for i, entry in enumerate(st.session_state.tarif_pendapatan_list):
+            cols = st.columns([3, 2])
+            with cols[0]:
+                st.session_state.tarif_pendapatan_list[i]["jenis"] = st.selectbox(
+                    f"Jenis Jasa {i+1}",
+                    options=coa_list,
+                    index=coa_list.index(entry["jenis"]) if entry["jenis"] in coa_list else 0,
+                    key=f"jenis_pendapatan_{i}"
+                )
+            with cols[1]:
+                st.session_state.tarif_pendapatan_list[i]["tarif"] = st.number_input(
+                    f"Tarif {i+1}",
+                    min_value=0.0,
+                    step=1000.0,
+                    value=entry["tarif"],
+                    key=f"tarif_pendapatan_{i}"
+                )
+
+        submit_button = st.form_submit_button("Submit")
+
+    cols_btn = st.columns([2, 2])
+    with cols_btn[0]:
+        if st.button("➕ Tambah Baris Jasa (Pendapatan)"):
+            st.session_state.tarif_pendapatan_list.append({"jenis": "", "tarif": 0.0})
+            st.rerun()
+    with cols_btn[1]:
+        for i in range(len(st.session_state.tarif_pendapatan_list)):
+            if st.button(f"❌ Hapus Baris {i+1} (Pendapatan)", key=f"hapus_pendapatan_{i}"):
+                st.session_state.tarif_pendapatan_list.pop(i)
+                st.rerun()
+
+    if submit_button:
+        try:
+            jasa_tarif_final = [
+                entry for entry in st.session_state.tarif_pendapatan_list
+                if entry["jenis"] and entry["tarif"] > 0
+            ]
+            if not jasa_tarif_final:
+                st.error("Minimal satu jasa dengan tarif harus diisi.")
+                st.stop()
+
+            # Buat dictionary dengan format string key: jenis_jasa_1_pendapatan, tarif_1_pendapatan, dst
+            jasa_tarif_string_dict = {}
+            for idx, entry in enumerate(jasa_tarif_final, start=1):
+                jasa_tarif_string_dict[f"jenis_jasa_{idx}_pendapatan"] = entry["jenis"]
+                jasa_tarif_string_dict[f"tarif_{idx}_pendapatan"] = str(entry["tarif"])  # jika mau float, hilangkan str()
+
+            total_tarif = sum(entry["tarif"] for entry in jasa_tarif_final)
+            produksi_ton = selected_data["produksi_ton"]
+            total_pendapatan = total_tarif * produksi_ton
+
+            data_update = {
+                **jasa_tarif_string_dict,  # masukkan pasangan jenis/tarif
+                "pendapatan": total_pendapatan,
+                "nota": "belum",
+                "pertanggung_jawaban": "belum",
+                "timestamp_pendapatan": datetime.now()
+            }
+
+            db.collection("kegiatan_operasional").document(selected_data["doc_id"]).update(data_update)
+            st.success("✅ Data pendapatan berhasil disimpan.")
+            del st.session_state.tarif_pendapatan_list  
+
+        except Exception as e:
+            st.error(f"Gagal menyimpan data: {e}")
+
+elif st.session_state.menu == "Update Pendapatan":
+    st.markdown(f"<h2 style='color:{PRIMARY_COLOR};'>Update Pendapatan</h2>", unsafe_allow_html=True)
+    st.write("Pilih kegiatan untuk mengubah data pendapatannya:")
+
+    try:
+        kegiatan_docs = list(
+            db.collection("kegiatan_operasional")
+            .where("jenis_jasa_1_pendapatan", "!=", None)  # Filter yang punya data pendapatan
+            .stream()
+        )
+
+        ppk_list = []
+        for doc in kegiatan_docs:
+            data = doc.to_dict()
+            if "ppk" in data:
+                # Parse data pendapatan dari string fields menjadi list dict
+                pendapatan_list = []
+                i = 1
+                while f"jenis_jasa_{i}_pendapatan" in data and f"tarif_{i}_pendapatan" in data:
+                    jenis = data.get(f"jenis_jasa_{i}_pendapatan", "")
+                    tarif = data.get(f"tarif_{i}_pendapatan", 0.0)
+                    if jenis and tarif:
+                        pendapatan_list.append({"jenis": jenis, "tarif": float(tarif)})
+                    i += 1
+
+                ppk_list.append({
+                    "label": data.get("ppk", ""),
+                    "ppk": data.get("ppk", ""),
+                    "nama_kapal": data.get("nama_kapal", ""),
+                    "produksi_ton": data.get("produksi_ton", 0),
+                    "doc_id": doc.id,
+                    "pendapatan_list": pendapatan_list
+                })
+
+        if not ppk_list:
+            st.warning("Tidak ada kegiatan dengan data pendapatan untuk diperbarui.")
+            st.stop()
+
+    except Exception as e:
+        st.error(f"Gagal mengambil data kegiatan: {e}")
+        st.stop()
+
+    selected_label = st.selectbox("Pilih PPK", options=[k["label"] for k in ppk_list])
+    selected_data = next(item for item in ppk_list if item["label"] == selected_label)
+
+    st.write(f"**Nama Kapal:** {selected_data['nama_kapal']}")
+    st.write(f"**Produksi:** {selected_data['produksi_ton']} ton")
+
+    try:
+        coa_docs = db.collection("COA_Pendapatan").stream()
+        coa_list = []
+        for doc in coa_docs:
+            data = doc.to_dict()
+            detail = data.get("detail", [])
+            if isinstance(detail, list):
+                coa_list.extend(detail)
+        coa_list = sorted(list(set(coa_list)))
+    except Exception as e:
+        st.error(f"Gagal mengambil data COA pendapatan: {e}")
+        coa_list = []
+
+    st.markdown("### Update Jenis Jasa dan Tarif (Pendapatan)")
+
+    # Set session state jika belum ada atau jika PPK berubah
+    if "update_tarif_pendapatan_list" not in st.session_state or st.session_state.get("update_pendapatan_target_id") != selected_data["doc_id"]:
+        st.session_state.update_tarif_pendapatan_list = selected_data["pendapatan_list"].copy()
+        st.session_state.update_pendapatan_target_id = selected_data["doc_id"]
+
+    with st.form(key="form_update_pendapatan"):
+        for i, entry in enumerate(st.session_state.update_tarif_pendapatan_list):
+            cols = st.columns([3, 2])
+            with cols[0]:
+                st.session_state.update_tarif_pendapatan_list[i]["jenis"] = st.selectbox(
+                    f"Jenis Jasa {i+1} (Pendapatan Update)",
+                    options=coa_list,
+                    index=coa_list.index(entry["jenis"]) if entry["jenis"] in coa_list else 0,
+                    key=f"update_jenis_pendapatan_{i}"
+                )
+            with cols[1]:
+                st.session_state.update_tarif_pendapatan_list[i]["tarif"] = st.number_input(
+                    f"Tarif {i+1} (Pendapatan Update)",
+                    min_value=0.0,
+                    step=1000.0,
+                    value=entry["tarif"],
+                    key=f"update_tarif_pendapatan_{i}"
+                )
+
+        submit_update = st.form_submit_button("Update Pendapatan")
+    # Tombol hapus dan tambah baris
+    for i in range(len(st.session_state.update_tarif_pendapatan_list)):
+        if st.button(f"❌ Hapus Baris {i+1} (Pendapatan)", key=f"update_remove_pendapatan_{i}"):
+            st.session_state.update_tarif_pendapatan_list.pop(i)
+            st.experimental_rerun()
+
+    if st.button("➕ Tambah Baris Jasa (Pendapatan Update)"):
+        st.session_state.update_tarif_pendapatan_list.append({"jenis": "", "tarif": 0.0})
+        st.experimental_rerun()
+
+    if submit_update:
+        try:
+            jasa_tarif_final = [
+                entry for entry in st.session_state.update_tarif_pendapatan_list
+                if entry["jenis"] and entry["tarif"] > 0
+            ]
+            if not jasa_tarif_final:
+                st.error("Minimal satu jasa dengan tarif harus diisi.")
+                st.stop()
+
+            # Simpan ke string fields jenis_jasa_X_pendapatan, tarif_X_pendapatan
+            jasa_tarif_string_dict = {}
+            for idx, entry in enumerate(jasa_tarif_final, start=1):
+                jasa_tarif_string_dict[f"jenis_jasa_{idx}_pendapatan"] = entry["jenis"]
+                jasa_tarif_string_dict[f"tarif_{idx}_pendapatan"] = str(entry["tarif"])  # string atau float
+
+            total_tarif = sum(entry["tarif"] for entry in jasa_tarif_final)
+            total_pendapatan = total_tarif * selected_data["produksi_ton"]
+
+            data_update = {
+                **jasa_tarif_string_dict,
+                "pendapatan": total_pendapatan,
+                "timestamp_update_pendapatan": datetime.now()
+            }
+
+            db.collection("kegiatan_operasional").document(selected_data["doc_id"]).update(data_update)
+
+            st.success("✅ Data pendapatan berhasil diperbarui.")
+            del st.session_state.update_tarif_pendapatan_list
+            del st.session_state.update_pendapatan_target_id
+
+        except Exception as e:
+            st.error(f"Gagal memperbarui data: {e}")
 
 elif st.session_state.menu == "Dashboard Operasional Kapal":
     left_col, right_col = st.columns([3.2, 2])
@@ -579,7 +927,7 @@ elif st.session_state.menu == "Dashboard Pendapatan & Biaya":
             selesai = item.get("tanggal_selesai")
             nota = str(item.get("nota", "")).lower()
 
-            if mulai and selesai and pembiayaan_mulai_filter <= mulai.date() <= pembiayaan_selesai_filter:
+            if mulai and selesai:
                 pembiayaan_data.append({
                     "doc_id": doc_id,
                     "PPK": item.get("ppk", "-"),
@@ -593,7 +941,7 @@ elif st.session_state.menu == "Dashboard Pendapatan & Biaya":
                     "Pertanggungjawaban": item.get("pertanggungjawaban", "-")
                 })
 
-            if mulai and selesai and first_day_last_month <= mulai.date() <= last_day_last_month and nota != "done":
+            if mulai and selesai and (nota != "done" or item.get("pertanggungjawaban", "").lower() != "done"):
                 pymad_auto_data.append({
                     "PPK": item.get("ppk", "-"),
                     "Nama Kapal": item.get("nama_kapal", "-"),
@@ -625,10 +973,12 @@ elif st.session_state.menu == "Dashboard Pendapatan & Biaya":
                     if nota_checked and row["Nota"].lower() != "done":
                         db.collection("kegiatan_operasional").document(row["doc_id"]).update({"nota": "done"})
                         st.success("✅ Nota diperbarui menjadi 'done'")
+                        st.rerun()
 
                     if ptj_checked and row["Pertanggungjawaban"].lower() != "done":
                         db.collection("kegiatan_operasional").document(row["doc_id"]).update({"pertanggungjawaban": "done"})
                         st.success("✅ Pertanggungjawaban diperbarui menjadi 'done'")
+                        st.rerun()
 
         else:
             st.info("Tidak ada data pembiayaan untuk rentang tanggal ini.")
