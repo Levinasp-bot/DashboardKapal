@@ -733,11 +733,11 @@ elif st.session_state.menu == "Update Pendapatan":
     for i in range(len(st.session_state.update_tarif_pendapatan_list)):
         if st.button(f"❌ Hapus Baris {i+1} (Pendapatan)", key=f"update_remove_pendapatan_{i}"):
             st.session_state.update_tarif_pendapatan_list.pop(i)
-            st.experimental_rerun()
+            st.rerun()
 
     if st.button("➕ Tambah Baris Jasa (Pendapatan Update)"):
         st.session_state.update_tarif_pendapatan_list.append({"jenis": "", "tarif": 0.0})
-        st.experimental_rerun()
+        st.rerun()
 
     if submit_update:
         try:
