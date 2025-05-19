@@ -463,17 +463,23 @@ elif st.session_state.menu == "Update Pembiayaan":
                     key=f"update_jenis_{i}"
                 )
             with cols[1]:
-                st.session_state.update_tarif_list[i]["tarif"] = st.number_input(
+                default_value = f"{entry['tarif']:,.0f}".replace(",", ".") if isinstance(entry['tarif'], (int, float)) else "0"
+                tarif_input = st.text_input(
                     f"Tarif {i+1} (Update)",
-                    min_value=0.0,
-                    step=1000.0,
-                    value=entry["tarif"],
+                    value=default_value,
                     key=f"update_tarif_{i}"
                 )
 
+                # Validasi dan konversi ke float
+                try:
+                    tarif_clean = float(tarif_input.replace(".", "").replace(",", "."))
+                except:
+                    tarif_clean = 0.0
+
+                st.session_state.update_tarif_list[i]["tarif"] = tarif_clean
+
         submit_update = st.form_submit_button("Update Pembiayaan")
 
-    # Tombol hapus dan tambah baris
     for i in range(len(st.session_state.update_tarif_list)):
         if st.button(f"❌ Hapus Baris {i+1}", key=f"update_remove_{i}"):
             st.session_state.update_tarif_list.pop(i)
@@ -507,7 +513,6 @@ elif st.session_state.menu == "Update Pembiayaan":
                 "timestamp_update_pembiayaan": datetime.now()
             }
 
-            # update Firestore
             db.collection("kegiatan_operasional").document(selected_data["doc_id"]).update(data_update)
 
             st.success("✅ Data pembiayaan berhasil diperbarui.")
@@ -585,13 +590,20 @@ elif st.session_state.menu == "Input Pendapatan":
                     key=f"jenis_pendapatan_{i}"
                 )
             with cols[1]:
-                st.session_state.tarif_pendapatan_list[i]["tarif"] = st.number_input(
+                default_value = f"{entry['tarif']:,.0f}".replace(",", ".") if isinstance(entry["tarif"], (int, float)) else "0"
+                tarif_input = st.text_input(
                     f"Tarif {i+1}",
-                    min_value=0.0,
-                    step=1000.0,
-                    value=entry["tarif"],
+                    value=default_value,
                     key=f"tarif_pendapatan_{i}"
                 )
+
+                # Validasi dan konversi ke float
+                try:
+                    tarif_clean = float(tarif_input.replace(".", "").replace(",", "."))
+                except:
+                    tarif_clean = 0.0
+
+                st.session_state.tarif_pendapatan_list[i]["tarif"] = tarif_clean
 
         submit_button = st.form_submit_button("Submit")
 
@@ -927,6 +939,12 @@ elif st.session_state.menu == "Dashboard Pendapatan & Biaya":
             selesai = item.get("tanggal_selesai")
             nota = str(item.get("nota", "")).lower()
 
+            pendapatan = item.get("pendapatan", 0)
+            biaya = item.get("biaya", 0)
+
+            pendapatan_formatted = f"{pendapatan:,.0f}".replace(",", ".") if isinstance(pendapatan, (int, float)) else pendapatan
+            biaya_formatted = f"{biaya:,.0f}".replace(",", ".") if isinstance(biaya, (int, float)) else biaya
+
             if mulai and selesai:
                 pembiayaan_data.append({
                     "doc_id": doc_id,
@@ -935,21 +953,24 @@ elif st.session_state.menu == "Dashboard Pendapatan & Biaya":
                     "Mulai": mulai.strftime("%d-%m-%Y %H:%M") if mulai else "-",
                     "Selesai": selesai.strftime("%d-%m-%Y %H:%M") if selesai else "-",
                     "Produksi": item.get("produksi_ton", "-"),
-                    "Pendapatan": item.get("pendapatan", "-"),
-                    "Biaya": item.get("biaya", "-"),
+                    "Pendapatan": pendapatan_formatted,
+                    "Biaya": biaya_formatted,
                     "Nota": item.get("nota", "-"),
                     "Pertanggungjawaban": item.get("pertanggungjawaban", "-")
                 })
 
+            pendapatan_raw = item.get("pendapatan", 0)
+            biaya_raw = item.get("biaya", 0)
+
             if mulai and selesai and (nota != "done" or item.get("pertanggungjawaban", "").lower() != "done"):
                 pymad_auto_data.append({
-                    "PPK": item.get("ppk", "-"),
-                    "Nama Kapal": item.get("nama_kapal", "-"),
-                    "Mulai": mulai.strftime("%d-%m-%Y %H:%M") if mulai else "-",
-                    "Selesai": selesai.strftime("%d-%m-%Y %H:%M") if selesai else "-",
-                    "Pendapatan": item.get("pendapatan", "-"),
-                    "Biaya": item.get("biaya", "-")
-                })
+                "PPK": item.get("ppk", "-"),
+                "Nama Kapal": item.get("nama_kapal", "-"),
+                "Mulai": mulai.strftime("%d-%m-%Y %H:%M") if mulai else "-",
+                "Selesai": selesai.strftime("%d-%m-%Y %H:%M") if selesai else "-",
+                "Pendapatan": f"{pendapatan_raw:,.0f}".replace(",", ".") if isinstance(pendapatan_raw, (int, float)) else pendapatan_raw,
+                "Biaya": f"{biaya_raw:,.0f}".replace(",", ".") if isinstance(biaya_raw, (int, float)) else biaya_raw
+            })
 
         if pembiayaan_data:
             st.markdown("### Data Pembiayaan")
